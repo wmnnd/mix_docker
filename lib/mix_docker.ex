@@ -25,16 +25,17 @@ defmodule MixDocker do
   end
 
   def release(args) do
-    app     = app_name()
-    version = app_version() || release_version()
+    app          = app_name()
+    version      = app_version() || release_version()
+    {opts, args} = extract_opts(args)
 
     cid = "mix_docker-#{:rand.uniform(1000000)}"
 
     with_dockerfile @dockerfile_release, fn ->
-      docker :rm, cid
+      unless opts[:no_rm], do: docker :rm, cid
       docker :create, cid, image(:build)
       docker :cp, cid, "/opt/app/_build/#{Mix.env}/rel/#{app}/releases/#{version}/#{app}.tar.gz", "#{app}.tar.gz"
-      docker :rm, cid
+      unless opts[:no_rm], do: docker :rm, cid
       docker :build, @dockerfile_release, image(:release), args
     end
 
@@ -113,6 +114,7 @@ defmodule MixDocker do
   # Simple recursive extraction instead of OptionParser to keep other (docker) flags intact
   defp extract_opts(args), do: extract_opts([], args, [])
   defp extract_opts(head, ["--tag", tag | tail], opts), do: extract_opts(head, tail, Keyword.put(opts, :tag, tag))
+  defp extract_opts(head, ["--no-rm" | tail], opts), do: extract_opts(head, tail, Keyword.put(opts, :no_rm, true))
   defp extract_opts(head, [], opts), do: {opts, head}
   defp extract_opts(head, [h | tail], opts), do: extract_opts(head ++ [h], tail, opts)
 
